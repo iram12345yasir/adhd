@@ -7,11 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  PATIENT
+  CLINICIAN
+  ADMIN
+}
+
 model User {
   id            String         @id @default(cuid())
   name          String
   email         String         @unique
   password      String
+  role          Role           @default(PATIENT)
+  isActive      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   tasks         Task[]
