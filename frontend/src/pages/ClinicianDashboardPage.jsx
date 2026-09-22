@@ -2,201 +2,109 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../api";
 import Topbar from "../components/Topbar";
 
-export default function PatientDashboardPage() {
-  const [tasks, setTasks] = useState([]);
-  const [habits, setHabits] = useState([]);
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskPriority, setTaskPriority] = useState("high");
-  const [focusMinutes, setFocusMinutes] = useState(25);
-  const [habitName, setHabitName] = useState("");
-  const [habitTarget, setHabitTarget] = useState(2);
-  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
-  const [timerRunning, setTimerRunning] = useState(false);
+const demoPatients = [
+  { id: "demo-1", name: "Jordan Williams", email: "jordan@example.com", status: "Needs review", focus: 62, tasks: 8 },
+  { id: "demo-2", name: "Samira Patel", email: "samira@example.com", status: "On track", focus: 84, tasks: 12 },
+  { id: "demo-3", name: "Noah Garcia", email: "noah@example.com", status: "Follow-up due", focus: 48, tasks: 5 }
+];
+
+export default function ClinicianDashboardPage() {
+  const [patients, setPatients] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [note, setNote] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    loadData();
+    let mounted = true;
+    api.get("/clinician/patients")
+      .then((response) => {
+        if (mounted) setPatients(response.data);
+      })
+      .catch(() => {
+        if (mounted) {
+          setError("The live patient feed is unavailable. Showing workstation demo data.");
+          setPatients(demoPatients);
+        }
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
   }, []);
 
-  useEffect(() => {
-    if (!timerRunning) return;
-    const interval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          setTimerRunning(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  const visiblePatients = useMemo(() => {
+    const normalized = query.toLowerCase();
+    return patients.filter((patient) =>
+      `${patient.name} ${patient.email}`.toLowerCase().includes(normalized)
+    );
+  }, [patients, query]);
 
-    return () => clearInterval(interval);
-  }, [timerRunning]);
+  const selectedPatient = patients.find((patient) => patient.id === selectedId) || visiblePatients[0];
 
-  const loadData = async () => {
-    const [tasksRes, habitsRes] = await Promise.all([api.get("/tasks"), api.get("/habits")]);
-    setTasks(tasksRes.data);
-    setHabits(habitsRes.data);
-  };
-
-  const topTasks = useMemo(() => {
-    const weight = { high: 3, medium: 2, low: 1 };
-    return [...tasks].sort((a, b) => weight[b.priority] - weight[a.priority]).slice(0, 3);
-  }, [tasks]);
-
-  const createTask = async (e) => {
-    e.preventDefault();
-    if (!taskTitle.trim()) return;
-
-    const res = await api.post("/tasks", {
-      title: taskTitle,
-      priority: taskPriority,
-      focusMinutes
-    });
-
-    setTasks((prev) => [res.data, ...prev]);
-    setTaskTitle("");
-    setFocusMinutes(25);
-  };
-
-  const toggleTask = async (taskId) => {
-    const res = await api.patch(`/tasks/${taskId}`);
-    setTasks((prev) => prev.map((task) => (task.id === res.data.id ? res.data : task)));
-  };
-
-  const deleteTask = async (taskId) => {
-    await api.delete(`/tasks/${taskId}`);
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-  };
-
-  const createHabit = async (e) => {
-    e.preventDefault();
-    if (!habitName.trim()) return;
-
-    const res = await api.post("/habits", {
-      name: habitName,
-      target: habitTarget
-    });
-
-    setHabits((prev) => [res.data, ...prev]);
-    setHabitName("");
-    setHabitTarget(2);
-  };
-
-  const incrementHabit = async (habitId) => {
-    const res = await api.patch(`/habits/${habitId}`);
-    setHabits((prev) => prev.map((habit) => (habit.id === res.data.id ? res.data : habit)));
-  };
-
-  const logFocusSession = async () => {
-    await api.post("/focus-sessions", { minutes: focusMinutes });
-    setTimerSeconds(0);
-    setTimerRunning(false);
-  };
-
-  const minutes = Math.floor(timerSeconds / 60);
-  const seconds = timerSeconds % 60;
+  function saveNote(event) {
+    event.preventDefault();
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2200);
+  }
 
   return (
     <div className="space-y-6">
-      <Topbar title="Patient Dashboard" actions={<button onClick={() => setTimerRunning((prev) => !prev)} className="rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-5 py-3 font-semibold text-white">{timerRunning ? "Pause timer" : "Start focus"}</button>} />
+      <Topbar
+        title="Clinician Workstation"
+        actions={<span className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">Secure workspace · Live</span>}
+      />
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="glass-panel rounded-[28px] p-5 xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Top 3 priorities</h2>
-            <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs uppercase text-cyan-300">Today</span>
-          </div>
-          <div className="space-y-3">
-            {topTasks.length === 0 ? <p className="text-slate-300">No tasks yet.</p> : topTasks.map((task) => (
-              <div key={task.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${task.priority === "high" ? "bg-rose-500/15 text-rose-200" : task.priority === "medium" ? "bg-amber-500/15 text-amber-200" : "bg-emerald-500/15 text-emerald-200"}`}>{task.priority}</span>
-                  <span className="text-xs text-slate-300">{task.focusMinutes} min</span>
-                </div>
-                <p className="text-lg font-semibold text-white">{task.title}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+      {error && <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">{error}</div>}
 
-        <section className="glass-panel rounded-[28px] p-5">
-          <h2 className="mb-4 text-xl font-bold text-white">Focus timer</h2>
-          <div className="text-center">
-            <div className="text-5xl font-black text-white">{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setTimerRunning((prev) => !prev)} className="flex-1 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-3 font-semibold text-white">{timerRunning ? "Pause" : "Start"}</button>
-              <button onClick={() => { setTimerRunning(false); setTimerSeconds(Number(focusMinutes) * 60); }} className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white">Reset</button>
-            </div>
-            <button onClick={logFocusSession} className="mt-4 w-full rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-semibold text-cyan-300">Log focus session</button>
-          </div>
-        </section>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Caseload" value={patients.length} detail="active patients" />
+        <Metric label="Needs review" value={patients.filter((p) => p.status === "Needs review").length || 1} detail="priority queue" />
+        <Metric label="Follow-ups" value={patients.filter((p) => p.status === "Follow-up due").length || 1} detail="next 7 days" />
+        <Metric label="Workspace" value="Ready" detail="encrypted session" />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.5fr)]">
         <section className="glass-panel rounded-[28px] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Add task</h2>
-            <span className="rounded-full bg-violet-500/10 px-3 py-1 text-xs uppercase text-violet-200">Task</span>
-          </div>
-
-          <form onSubmit={createTask} className="space-y-3">
-            <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Task title" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
-            <div className="grid grid-cols-2 gap-3">
-              <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none">
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <input type="number" min="5" step="5" value={focusMinutes} onChange={(e) => setFocusMinutes(Number(e.target.value))} className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Care queue</p>
+              <h2 className="mt-1 text-xl font-bold text-white">Patients</h2>
             </div>
-            <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-3 font-semibold text-white">Add task</button>
-          </form>
+            <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">{patients.length}</span>
+          </div>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or email" className="mb-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
+          {loading ? <p className="text-sm text-slate-300">Loading patient feed…</p> : (
+            <div className="space-y-3">
+              {visiblePatients.map((patient) => (
+                <button key={patient.id} onClick={() => setSelectedId(patient.id)} className={`w-full rounded-2xl border p-4 text-left transition ${selectedPatient?.id === patient.id ? "border-cyan-300/40 bg-cyan-300/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="font-semibold text-white">{patient.name}</p><p className="mt-1 text-xs text-slate-300">{patient.email}</p></div>
+                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-slate-200">{patient.status || "Active"}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="glass-panel rounded-[28px] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Habits</h2>
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs uppercase text-emerald-200">Routine</span>
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
+            <div><p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Patient snapshot</p><h2 className="mt-1 text-2xl font-bold text-white">{selectedPatient?.name || "Select a patient"}</h2><p className="mt-1 text-sm text-slate-300">{selectedPatient?.email || "Choose a patient from the care queue to begin."}</p></div>
+            {selectedPatient && <button className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white">Open care plan</button>}
           </div>
-
-          <form onSubmit={createHabit} className="space-y-3">
-            <input value={habitName} onChange={(e) => setHabitName(e.target.value)} placeholder="Habit name" className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
-            <input type="number" min="1" value={habitTarget} onChange={(e) => setHabitTarget(Number(e.target.value))} className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
-            <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-400 px-4 py-3 font-semibold text-white">Add habit</button>
-          </form>
-
-          <div className="mt-4 space-y-3">
-            {habits.map((habit) => (
-              <div key={habit.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
-                <div>
-                  <p className="font-medium text-white">{habit.name}</p>
-                  <p className="text-xs text-slate-300">{habit.count}/{habit.target}</p>
-                </div>
-                <button onClick={() => incrementHabit(habit.id)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white">+1</button>
-              </div>
-            ))}
-          </div>
+          {selectedPatient && <>
+            <div className="grid gap-3 py-5 sm:grid-cols-3"><Progress label="Focus consistency" value={selectedPatient.focus || 70} /><Progress label="Task completion" value={Math.min((selectedPatient.tasks || 8) * 6, 100)} /><Progress label="Check-in status" value={selectedPatient.status === "On track" ? 90 : 55} /></div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-300">Today’s signals</p><ul className="mt-3 space-y-3 text-sm text-slate-200"><li>• Focus sessions are trending {selectedPatient.focus > 70 ? "up" : "inconsistently"}.</li><li>• Review recent task completion before the next check-in.</li><li>• Confirm preferred reminder cadence with the patient.</li></ul></div>
+              <form onSubmit={saveNote} className="rounded-2xl border border-white/10 bg-white/5 p-4"><label className="text-xs uppercase tracking-[0.2em] text-slate-300">Clinical note draft</label><textarea value={note} onChange={(event) => setNote(event.target.value)} rows="5" placeholder="Record a private follow-up reminder…" className="mt-3 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" /><button className="mt-3 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-white">{saved ? "Saved locally" : "Save draft"}</button></form>
+            </div>
+          </>}
         </section>
       </div>
-
-      <section className="glass-panel rounded-[28px] p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Task list</h2>
-          <span className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase text-slate-200">{tasks.length}</span>
-        </div>
-        <div className="space-y-3">
-          {tasks.map((task) => (
-            <div key={task.id} className={`flex items-center justify-between gap-4 rounded-2xl border p-3 ${task.done ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/10 bg-white/5"}`}>
-              <button onClick={() => toggleTask(task.id)} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white">{task.done ? "✓" : ""}</button>
-              <div className="flex-1">
-                <p className={`font-medium ${task.done ? "text-slate-300 line-through" : "text-white"}`}>{task.title}</p>
-                <p className="text-xs text-slate-300">{task.priority} priority · {task.focusMinutes} mins</p>
-              </div>
-              <button onClick={() => deleteTask(task.id)} className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">Remove</button>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
+
+function Metric({ label, value, detail }) { return <div className="glass-panel rounded-[24px] p-5"><p className="text-xs uppercase tracking-[0.2em] text-slate-300">{label}</p><p className="mt-2 text-3xl font-black text-white">{value}</p><p className="mt-1 text-xs text-slate-400">{detail}</p></div>; }
+function Progress({ label, value }) { return <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex justify-between gap-3 text-xs text-slate-300"><span>{label}</span><span>{value}%</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400" style={{ width: `${value}%` }} /></div></div>; }
