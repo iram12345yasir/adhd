@@ -1,76 +1,23 @@
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from 'react';
+import api from '../api';
+import Topbar from '../components/Topbar';
 
-const portalCards = [
-  { title: "Patient Portal", text: "Track focus, routines, and progress with ADHD-friendly tools.", tone: "from-violet-500 to-fuchsia-500" },
-  { title: "Clinician Portal", text: "Review patient progress, notes, and engagement metrics.", tone: "from-cyan-500 to-blue-500" },
-  { title: "Admin Portal", text: "Manage access, supervise platform roles, and control system health.", tone: "from-emerald-500 to-cyan-500" }
-];
+const starterTasks = [{ id: 'local-1', title: 'Choose one tiny priority', priority: 'high', focusMinutes: 10, done: false }, { id: 'local-2', title: 'Drink water and stretch', priority: 'medium', focusMinutes: 5, done: false }, { id: 'local-3', title: 'Check today’s messages', priority: 'low', focusMinutes: 10, done: true }];
+const starterHabits = [{ id: 'habit-1', name: 'Morning medication', count: 1, target: 1 }, { id: 'habit-2', name: 'Movement break', count: 2, target: 3 }, { id: 'habit-3', name: 'Wind-down routine', count: 0, target: 1 }];
 
-export default function LandingPage() {
-  return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 font-black text-white">A</div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-300">ADHD</p>
-              <h1 className="text-2xl font-black text-white">FocusFlow</h1>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <Link to="/login" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-white">Login</Link>
-            <Link to="/register" className="rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 font-semibold text-white">Register</Link>
-          </div>
-        </header>
-
-        <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-8">
-            <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-cyan-300">
-              secure wellness platform
-            </div>
-
-            <h2 className="max-w-xl text-5xl font-black leading-tight text-white md:text-6xl">
-              A smarter ADHD system for patients, clinicians, and admins.
-            </h2>
-
-            <p className="max-w-xl text-lg text-slate-300">
-              Personalized support, patient-first care, clinician visibility, and admin controls in one secure ecosystem.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <Link to="/register" className="rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-6 py-3 font-semibold text-white">Get started</Link>
-              <Link to="/login" className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 font-semibold text-white">Sign in</Link>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-[32px] p-6">
-            <div className="rounded-[28px] border border-white/10 bg-slate-900/60 p-5">
-              <p className="text-sm text-slate-300">Daily momentum</p>
-              <div className="mt-6 space-y-4">
-                <div className="rounded-2xl bg-white/5 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Focus score</p>
-                  <h3 className="mt-2 text-4xl font-black text-white">86%</h3>
-                </div>
-                <div className="rounded-2xl bg-white/5 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Therapy completion</p>
-                  <h3 className="mt-2 text-4xl font-black text-white">72%</h3>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-16 grid gap-6 md:grid-cols-3">
-          {portalCards.map((card) => (
-            <div key={card.title} className="glass-panel rounded-[28px] p-5">
-              <div className={`mb-4 h-12 w-12 rounded-2xl bg-gradient-to-br ${card.tone}`} />
-              <h3 className="text-2xl font-bold text-white">{card.title}</h3>
-              <p className="mt-3 text-slate-300">{card.text}</p>
-            </div>
-          ))}
-        </section>
-      </div>
-    </div>
-  );
+export default function PatientDashboardPage({ mode = 'today' }) {
+  const [tasks, setTasks] = useState(starterTasks); const [habits, setHabits] = useState(starterHabits); const [title, setTitle] = useState(''); const [minutes, setMinutes] = useState(10); const [running, setRunning] = useState(false); const [seconds, setSeconds] = useState(600); const [mood, setMood] = useState('steady'); const [apiState, setApiState] = useState('local-first');
+  useEffect(() => { let mounted = true; Promise.all([api.get('/tasks'), api.get('/habits')]).then(([a, b]) => { if (mounted) { if (a.data.length) setTasks(a.data); if (b.data.length) setHabits(b.data); setApiState('synced'); } }).catch(() => setApiState('offline-safe')); return () => { mounted = false; }; }, []);
+  useEffect(() => { if (!running) return; const timer = window.setInterval(() => setSeconds(value => { if (value <= 1) { setRunning(false); return 0; } return value - 1; }), 1000); return () => window.clearInterval(timer); }, [running]);
+  const top = useMemo(() => [...tasks].filter(t => !t.done).sort((a, b) => ({ high: 3, medium: 2, low: 1 }[b.priority] - ({ high: 3, medium: 2, low: 1 }[a.priority]))).slice(0, 3), [tasks]);
+  const toggle = async (task) => { setTasks(list => list.map(item => item.id === task.id ? { ...item, done: !item.done } : item)); try { if (!String(task.id).startsWith('local')) await api.patch(`/tasks/${task.id}`); } catch {} };
+  const addTask = async (event) => { event.preventDefault(); if (!title.trim()) return; const local = { id: `local-${Date.now()}`, title: title.trim(), priority: 'medium', focusMinutes: minutes, done: false }; setTasks(list => [local, ...list]); setTitle(''); try { const response = await api.post('/tasks', { title: local.title, priority: local.priority, focusMinutes: minutes }); setTasks(list => list.map(item => item.id === local.id ? response.data : item)); } catch {} };
+  const addHabit = (habit) => setHabits(list => list.map(item => item.id === habit.id ? { ...item, count: Math.min(item.count + 1, item.target) } : item));
+  const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); const secs = String(seconds % 60).padStart(2, '0'); const completed = tasks.filter(t => t.done).length;
+  return <div className="page-stack"><Topbar title={mode === 'progress' ? 'My progress' : 'Good morning, take it gently'} actions={<div className="sync-label"><span className="online-dot" /> {apiState}</div>} />{mode === 'progress' ? <ProgressView tasks={tasks} habits={habits} /> : <><section className="welcome-banner glass-panel"><div><span className="eyebrow">Tuesday, 22 September</span><h1>What would feel good<br />to finish today?</h1><p>Pick one small thing. Momentum can come after.</p></div><div className="mood-picker"><span>How are you feeling?</span><div>{['low', 'tired', 'steady', 'bright'].map(item => <button className={mood === item ? 'mood active' : 'mood'} onClick={() => setMood(item)} key={item}>{item === 'low' ? '☁' : item === 'tired' ? '◐' : item === 'steady' ? '◒' : '✦'}<small>{item}</small></button>)}</div></div></section><div className="metric-grid"><Metric label="Today’s progress" value={`${completed}/${tasks.length}`} detail="small wins completed" /><Metric label="Focus streak" value="6 days" detail="you are building rhythm" accent="mint" /><Metric label="Care plan" value="72%" detail="on track this week" accent="pink" /><Metric label="Check-in" value="Friday" detail="with Dr. Rivera" accent="blue" /></div><div className="patient-grid"><section className="glass-panel priority-panel"><PanelTitle eyebrow="your next steps" title="Top 3, not top 30" action="View all" /><div className="task-cards">{top.length ? top.map(task => <button className="priority-task" key={task.id} onClick={() => toggle(task)}><span className={`priority-dot ${task.priority}`} /><span><strong>{task.title}</strong><small>{task.focusMinutes} min · {task.priority} energy</small></span><span className="task-arrow">→</span></button>) : <Empty text="You did it. Nothing urgent here." />}</div><form className="quick-add" onSubmit={addTask}><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Add a tiny task…" /><button>+</button></form></section><FocusCard minutes={mins} seconds={secs} running={running} setRunning={setRunning} reset={() => { setRunning(false); setSeconds(minutes * 60 || 600); }} /></div><div className="patient-grid lower"><section className="glass-panel"><PanelTitle eyebrow="daily rhythm" title="Habits that support you" /><div className="habit-list">{habits.map(habit => <div className="habit-row" key={habit.id}><div><strong>{habit.name}</strong><div className="habit-progress"><span style={{ width: `${Math.min(habit.count / habit.target * 100, 100)}%` }} /></div><small>{habit.count} of {habit.target} today</small></div><button onClick={() => addHabit(habit)} className="circle-add">+</button></div>)}</div></section><section className="glass-panel insight-card"><span className="insight-icon">✦</span><span className="eyebrow">adaptive insight</span><h2>Your best focus window is 10–12am.</h2><p>Try placing one meaningful task here tomorrow. We’ll keep learning your rhythm with you.</p><button className="text-button">See my patterns →</button></section></div></>}</div>;
 }
+function Metric({ label, value, detail, accent = 'violet' }) { return <div className={`metric-card accent-${accent}`}><span className="metric-label">{label}</span><h3>{value}</h3><small>{detail}</small></div>; }
+function PanelTitle({ eyebrow, title, action }) { return <div className="panel-title"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div>{action && <button className="text-button">{action} →</button>}</div>; }
+function Empty({ text }) { return <div className="empty-state"><span>✦</span><p>{text}</p></div>; }
+function FocusCard({ minutes, seconds, running, setRunning, reset }) { return <section className="glass-panel focus-card"><PanelTitle eyebrow="reset your attention" title="Focus room" /><div className="timer-face"><span>{minutes}</span><i>:</i><span>{seconds}</span></div><p>One gentle sprint. Everything else can wait.</p><div className="timer-actions"><button className="button-primary" onClick={() => setRunning(!running)}>{running ? 'Pause' : 'Start focus'} <span>{running ? 'Ⅱ' : '▶'}</span></button><button className="button-ghost" onClick={reset}>Reset</button></div><div className="sound-chip">◉ soft ambient sound <span>on</span></div></section>; }
+function ProgressView({ tasks, habits }) { const complete = tasks.filter(t => t.done).length; return <><section className="welcome-banner glass-panel"><div><span className="eyebrow">your week at a glance</span><h1>Progress you can<br /><em>actually feel.</em></h1><p>Notice patterns, not perfection.</p></div><div className="big-score"><strong>{Math.round((complete / Math.max(tasks.length, 1)) * 100)}%</strong><span>task momentum</span></div></section><div className="metric-grid"><Metric label="Focus time" value="4h 20m" detail="+18% from last week" accent="mint" /><Metric label="Completed" value={complete} detail="tasks finished" /><Metric label="Habits" value={habits.filter(h => h.count >= h.target).length} detail="daily targets reached" accent="pink" /><Metric label="Best day" value="Tuesday" detail="your strongest rhythm" accent="blue" /></div><section className="glass-panel chart-panel"><PanelTitle eyebrow="momentum map" title="Your focus across the week" /><div className="fake-chart">{[42, 64, 48, 82, 68, 90, 58].map((height, i) => <div className="chart-bar-wrap" key={i}><div className="chart-bar" style={{ height: `${height}%` }} /><small>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</small></div>)}</div></section></>; }

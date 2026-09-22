@@ -1,70 +1,17 @@
-import { NavLink } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-const navMap = {
-  PATIENT: [
-    { to: "/patient/dashboard", label: "Dashboard" },
-    { to: "/profile", label: "Profile" }
-  ],
-  CLINICIAN: [
-    { to: "/clinician/dashboard", label: "Clinical Dashboard" },
-    { to: "/profile", label: "Profile" }
-  ],
-  ADMIN: [
-    { to: "/admin/dashboard", label: "Admin Control" },
-    { to: "/profile", label: "Profile" }
-  ]
-};
+const demos = [
+  ['patient@adhd.app', 'Patient portal'], ['clinician@adhd.app', 'Clinician workstation'], ['admin@adhd.app', 'Admin control']
+];
 
-export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const items = navMap[user?.role] || navMap.PATIENT;
-
-  return (
-    <aside className="glass-panel w-full max-w-[280px] p-5">
-      <div className="mb-7 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 font-black text-white">
-          A
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-300">ADHD</p>
-          <h2 className="text-xl font-bold text-white">FocusFlow</h2>
-        </div>
-      </div>
-
-      <nav className="space-y-2">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `block rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                isActive
-                  ? "bg-white/10 text-white shadow-glow"
-                  : "text-slate-300 hover:bg-white/5 hover:text-white"
-              }`
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Portal</p>
-        <div className="mt-3 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-white">{user?.name || "User"}</p>
-            <p className="text-xs text-slate-300">{user?.role}</p>
-          </div>
-          <button
-            onClick={logout}
-            className="rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200"
-          >
-            Log out
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
+export default function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('patient@adhd.app');
+  const [password, setPassword] = useState('password123');
+  const [error, setError] = useState('');
+  const submit = async (event) => { event.preventDefault(); setError(''); try { const result = await login(email, password); const role = result.user.role; navigate(role === 'ADMIN' ? '/admin/dashboard' : role === 'CLINICIAN' ? '/clinician/dashboard' : '/patient/dashboard'); } catch (err) { setError(err.response?.data?.message || 'Unable to sign in'); } };
+  return <div className="auth-shell"><div className="auth-art"><div className="orb orb-one" /><div className="orb orb-two" /><span className="eyebrow">private ADHD care system</span><h1>Make space for<br /><em>one next thing.</em></h1><p>FocusFlow brings patient support, clinician care, and operational clarity into one calm workspace.</p><div className="auth-proof"><span>✦</span><div><strong>Designed for attention differences</strong><small>Short steps · visible progress · no overwhelm</small></div></div></div><div className="auth-card glass-panel"><div className="brand auth-brand"><div className="brand-mark">A</div><div><span className="eyebrow">welcome back</span><h2>Sign in</h2></div></div><form onSubmit={submit} className="form-stack"><label>Email<input value={email} onChange={e => setEmail(e.target.value)} type="email" required /></label><label>Password<input value={password} onChange={e => setPassword(e.target.value)} type="password" required /></label>{error && <div className="form-error">{error}</div>}<button className="button-primary">Open workspace <span>→</span></button></form><div className="demo-logins"><span>Quick demo access</span>{demos.map(([address, label]) => <button key={address} onClick={() => { setEmail(address); setPassword('password123'); }}>{label}</button>)}</div><p className="auth-footer">New here? <Link to="/register">Create an account</Link></p></div></div>;
 }
