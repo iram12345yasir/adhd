@@ -1,0 +1,13 @@
+{
+  "collection": [
+    {
+      "name": "ADHD API",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health"
+      }
+    }
+  ],
+  "variable": [{ "key": "baseUrl", "value": "http://localhost:5000/api" }]
+}
