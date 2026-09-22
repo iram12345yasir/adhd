@@ -1,110 +1,305 @@
-import { useEffect, useMemo, useState } from "react";
-import api from "../api";
-import Topbar from "../components/Topbar";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-const demoPatients = [
-  { id: "demo-1", name: "Jordan Williams", email: "jordan@example.com", status: "Needs review", focus: 62, tasks: 8 },
-  { id: "demo-2", name: "Samira Patel", email: "samira@example.com", status: "On track", focus: 84, tasks: 12 },
-  { id: "demo-3", name: "Noah Garcia", email: "noah@example.com", status: "Follow-up due", focus: 48, tasks: 5 }
-];
-
-export default function ClinicianDashboardPage() {
-  const [patients, setPatients] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [note, setNote] = useState("");
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    api.get("/clinician/patients")
-      .then((response) => {
-        if (mounted) setPatients(response.data);
-      })
-      .catch(() => {
-        if (mounted) {
-          setError("The live patient feed is unavailable. Showing workstation demo data.");
-          setPatients(demoPatients);
-        }
-      })
-      .finally(() => mounted && setLoading(false));
-    return () => { mounted = false; };
-  }, []);
-
-  const visiblePatients = useMemo(() => {
-    const normalized = query.toLowerCase();
-    return patients.filter((patient) =>
-      `${patient.name} ${patient.email}`.toLowerCase().includes(normalized)
-    );
-  }, [patients, query]);
-
-  const selectedPatient = patients.find((patient) => patient.id === selectedId) || visiblePatients[0];
-
-  function saveNote(event) {
-    event.preventDefault();
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2200);
-  }
-
-  return (
-    <div className="space-y-6">
-      <Topbar
-        title="Clinician Workstation"
-        actions={<span className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">Secure workspace · Live</span>}
-      />
-
-      {error && <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">{error}</div>}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Caseload" value={patients.length} detail="active patients" />
-        <Metric label="Needs review" value={patients.filter((p) => p.status === "Needs review").length || 1} detail="priority queue" />
-        <Metric label="Follow-ups" value={patients.filter((p) => p.status === "Follow-up due").length || 1} detail="next 7 days" />
-        <Metric label="Workspace" value="Ready" detail="encrypted session" />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.5fr)]">
-        <section className="glass-panel rounded-[28px] p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Care queue</p>
-              <h2 className="mt-1 text-xl font-bold text-white">Patients</h2>
-            </div>
-            <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">{patients.length}</span>
-          </div>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or email" className="mb-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none" />
-          {loading ? <p className="text-sm text-slate-300">Loading patient feed…</p> : (
-            <div className="space-y-3">
-              {visiblePatients.map((patient) => (
-                <button key={patient.id} onClick={() => setSelectedId(patient.id)} className={`w-full rounded-2xl border p-4 text-left transition ${selectedPatient?.id === patient.id ? "border-cyan-300/40 bg-cyan-300/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div><p className="font-semibold text-white">{patient.name}</p><p className="mt-1 text-xs text-slate-300">{patient.email}</p></div>
-                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-slate-200">{patient.status || "Active"}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="glass-panel rounded-[28px] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
-            <div><p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Patient snapshot</p><h2 className="mt-1 text-2xl font-bold text-white">{selectedPatient?.name || "Select a patient"}</h2><p className="mt-1 text-sm text-slate-300">{selectedPatient?.email || "Choose a patient from the care queue to begin."}</p></div>
-            {selectedPatient && <button className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white">Open care plan</button>}
-          </div>
-          {selectedPatient && <>
-            <div className="grid gap-3 py-5 sm:grid-cols-3"><Progress label="Focus consistency" value={selectedPatient.focus || 70} /><Progress label="Task completion" value={Math.min((selectedPatient.tasks || 8) * 6, 100)} /><Progress label="Check-in status" value={selectedPatient.status === "On track" ? 90 : 55} /></div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-300">Today’s signals</p><ul className="mt-3 space-y-3 text-sm text-slate-200"><li>• Focus sessions are trending {selectedPatient.focus > 70 ? "up" : "inconsistently"}.</li><li>• Review recent task completion before the next check-in.</li><li>• Confirm preferred reminder cadence with the patient.</li></ul></div>
-              <form onSubmit={saveNote} className="rounded-2xl border border-white/10 bg-white/5 p-4"><label className="text-xs uppercase tracking-[0.2em] text-slate-300">Clinical note draft</label><textarea value={note} onChange={(event) => setNote(event.target.value)} rows="5" placeholder="Record a private follow-up reminder…" className="mt-3 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-white outline-none" /><button className="mt-3 rounded-2xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 py-2 text-sm font-semibold text-white">{saved ? "Saved locally" : "Save draft"}</button></form>
-            </div>
-          </>}
-        </section>
-      </div>
-    </div>
-  );
+:root {
+  color-scheme: dark;
+  --bg: #050816;
+  --panel: rgba(15, 23, 42, 0.72);
+  --panel-strong: rgba(15, 23, 42, 0.92);
+  --line: rgba(148, 163, 184, 0.2);
+  --text: #edf2ff;
+  --muted: #a5b4cf;
+  --violet: #7c3aed;
+  --cyan: #22d3ee;
+  --mint: #34d399;
+  --blush: #f472b6;
 }
 
-function Metric({ label, value, detail }) { return <div className="glass-panel rounded-[24px] p-5"><p className="text-xs uppercase tracking-[0.2em] text-slate-300">{label}</p><p className="mt-2 text-3xl font-black text-white">{value}</p><p className="mt-1 text-xs text-slate-400">{detail}</p></div>; }
-function Progress({ label, value }) { return <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex justify-between gap-3 text-xs text-slate-300"><span>{label}</span><span>{value}%</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400" style={{ width: `${value}%` }} /></div></div>; }
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Inter, 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.32), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.2), transparent 28%),
+    linear-gradient(135deg, #030712 0%, #111827 55%, #0f172a 100%);
+  color: var(--text);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+input, select, textarea {
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--text);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-loader {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  background: #020617;
+  color: #e2e8f0;
+}
+
+.loader-ring {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.18);
+  border-top-color: #67e8f9;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.workspace-shell {
+  max-width: 1600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .workspace-shell {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.workspace-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.glass-panel {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(18px);
+  border-radius: 28px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.42);
+}
+
+.sidebar {
+  width: 100%;
+  max-width: 280px;
+  border-radius: 28px;
+  padding: 24px 18px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nav-link {
+  display: block;
+  color: #dfe7ff;
+  text-decoration: none;
+  border-radius: 16px;
+  padding: 12px 14px;
+  transition: 180ms ease;
+}
+
+.nav-link:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 30px rgba(103, 232, 249, 0.15);
+}
+
+.page-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 30px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.36);
+}
+
+.metric-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.metric-card {
+  background: rgba(15, 23, 42, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 24px;
+  padding: 18px 18px 16px;
+}
+
+.metric-card h3 {
+  color: #e2e8f0;
+  font-size: 2rem;
+  margin: 12px 0 0;
+  font-weight: 800;
+}
+
+.metric-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #94a3b8;
+}
+
+.metric-detail {
+  font-size: 12px;
+  color: #b7c4db;
+  margin-top: 4px;
+}
+
+.hero-shell {
+  min-height: 100vh;
+  padding: 24px 18px;
+}
+
+.hero-panel {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, var(--violet), var(--cyan));
+  color: white;
+  border: none;
+  border-radius: 18px;
+  padding: 14px 22px;
+  font-weight: 700;
+  box-shadow: 0 18px 30px rgba(124, 58, 237, 0.3);
+}
+
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.72);
+  color: white;
+  border-radius: 18px;
+  padding: 14px 22px;
+  font-weight: 700;
+}
+
+.hero-grid {
+  display: grid;
+  gap: 40px;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+h1, h2, h3, h4, p {
+  margin-top: 0;
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.input-default {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.7);
+  color: white;
+}
+
+.widget-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.status-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.ring-progress {
+  width: 100%;
+  height: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ring-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8b5cf6, #22d3ee);
+}
+
+.workstation-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.5fr);
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .workstation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.service-panel {
+  border-radius: 26px;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.map-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+@media (max-width: 640px) {
+  .app-shell { padding: 12px; }
+  .sidebar { max-width: none; }
+}

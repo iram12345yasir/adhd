@@ -1,23 +1,86 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import api from "../api";
+import { Route, Routes, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import LandingPage from './pages/LandingPage';
+import PatientDashboardPage from './pages/PatientDashboardPage';
+import ClinicianDashboardPage from './pages/ClinicianDashboardPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import ProfilePage from './pages/ProfilePage';
+import Sidebar from './components/Sidebar';
+import ProtectedRoute from './components/ProtectedRoute';
 
-const AuthContext = createContext(null);
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) { setLoading(false); return; }
-    api.get("/auth/me").then((res) => setUser(res.data.user)).catch(() => { localStorage.removeItem("token"); setUser(null); }).finally(() => setLoading(false));
-  }, []);
-
-  const login = async (email, password) => { const res = await api.post("/auth/login", { email, password }); localStorage.setItem("token", res.data.token); setUser(res.data.user); return res.data; };
-  const register = async (name, email, password, role = "PATIENT") => { const res = await api.post("/auth/register", { name, email, password, role }); localStorage.setItem("token", res.data.token); setUser(res.data.user); return res.data; };
-  const logout = () => { localStorage.removeItem("token"); setUser(null); };
-
-  return <AuthContext.Provider value={{ user, setUser, login, register, logout, loading }}>{children}</AuthContext.Provider>;
+function getPortalHome(role) {
+  if (role === 'ADMIN') return '/admin/dashboard';
+  if (role === 'CLINICIAN') return '/clinician/dashboard';
+  return '/patient/dashboard';
 }
 
-export function useAuth() { return useContext(AuthContext); }
+export default function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="app-loader">
+        <div className="loader-ring" />
+        <p>Loading ADHD workstation…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <div className="workspace-shell">
+        <Sidebar />
+        <main className="workspace-main">
+          <Routes>
+            <Route
+              path="/patient/dashboard"
+              element={
+                <ProtectedRoute roles={['PATIENT']}>
+                  <PatientDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/clinician/dashboard"
+              element={
+                <ProtectedRoute roles={['CLINICIAN', 'ADMIN']}>
+                  <ClinicianDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute roles={['PATIENT', 'CLINICIAN', 'ADMIN']}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to={getPortalHome(user.role)} replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+}
