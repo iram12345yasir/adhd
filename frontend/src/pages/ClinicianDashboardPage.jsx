@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import '../styles/global.css';
 
 export default function ClinicianDashboardPage() {
   const [metrics, setMetrics] = useState({
